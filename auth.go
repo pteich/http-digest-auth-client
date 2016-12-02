@@ -1,10 +1,10 @@
 package httpDigestAuth
 
 import (
-	"fmt"
 	"crypto/md5"
 	"crypto/rand"
 	"encoding/base64"
+	"fmt"
 	"log"
 	"net/http"
 	"net/url"
@@ -47,16 +47,16 @@ func (d *DigestHeaders) digestChecksum() {
 	switch d.Algorithm {
 	case "MD5":
 		// HA1=MD5(username:realm:password)
-		d.HA1 = fmt.Sprintf("%x",md5.Sum([]byte(fmt.Sprintf("%s:%s:%s", d.Username, d.Realm, d.Password))))
+		d.HA1 = fmt.Sprintf("%x", md5.Sum([]byte(fmt.Sprintf("%s:%s:%s", d.Username, d.Realm, d.Password))))
 
 	case "MD5-sess":
 		// HA1=MD5(MD5(username:realm:password):nonce:cnonce)
-		d.HA1 = fmt.Sprintf("%x",md5.Sum([]byte(fmt.Sprintf("%x:%s:%s", md5.Sum([]byte(fmt.Sprintf("%s:%s:%s",
+		d.HA1 = fmt.Sprintf("%x", md5.Sum([]byte(fmt.Sprintf("%x:%s:%s", md5.Sum([]byte(fmt.Sprintf("%s:%s:%s",
 			d.Username, d.Realm, d.Password))), d.Nonce, d.Cnonce))))
 
 	}
 
-	d.HA2 = fmt.Sprintf("%x",md5.Sum([]byte(fmt.Sprintf("%s:%s", d.Method, d.Path))))
+	d.HA2 = fmt.Sprintf("%x", md5.Sum([]byte(fmt.Sprintf("%s:%s", d.Method, d.Path))))
 
 }
 
@@ -68,7 +68,7 @@ func (d *DigestHeaders) ApplyAuth(req *http.Request) {
 	d.Path = req.URL.RequestURI()
 	d.digestChecksum()
 
-	response := fmt.Sprintf("%x",md5.Sum([]byte(strings.Join([]string{d.HA1, d.Nonce, fmt.Sprintf("%08x", d.Nc),
+	response := fmt.Sprintf("%x", md5.Sum([]byte(strings.Join([]string{d.HA1, d.Nonce, fmt.Sprintf("%08x", d.Nc),
 		d.Cnonce, d.Qop, d.HA2}, ":"))))
 
 	AuthHeader := fmt.Sprintf(`Digest username="%s", realm="%s", nonce="%s", uri="%s", cnonce="%s", nc=%08x, qop=%s, response="%s", algorithm=%s`,
@@ -104,7 +104,7 @@ func (d *DigestHeaders) Auth(username string, password string, uri string) (*Dig
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == 401 {
+	if resp.StatusCode == http.StatusUnauthorized {
 
 		authn := digestAuthParams(resp)
 		algorithm := authn["algorithm"]
@@ -137,7 +137,12 @@ func (d *DigestHeaders) Auth(username string, password string, uri string) (*Dig
 			err = fmt.Errorf("response status code was %v", resp.StatusCode)
 		}
 		return d, err
+
+	} else if resp.StatusCode == http.StatusOK {
+		log.Printf("response status code was 200. Ignoring auth")
+		return nil, nil
 	}
+
 	return nil, fmt.Errorf("response status code should have been 401, it was %v", resp.StatusCode)
 }
 
@@ -166,10 +171,9 @@ func digestAuthParams(r *http.Response) map[string]string {
 func randomKey() string {
 	k := make([]byte, 12)
 	for bytes := 0; bytes < len(k); {
-		if n, err := rand.Read(k[bytes:]); err==nil {
+		if n, err := rand.Read(k[bytes:]); err == nil {
 			bytes += n
 		}
 	}
 	return base64.StdEncoding.EncodeToString(k)
 }
-
