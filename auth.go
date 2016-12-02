@@ -132,7 +132,7 @@ func (d *DigestHeaders) Auth(username string, password string, uri string) (*Dig
 			return d, err
 		}
 		defer resp.Body.Close()
-		if resp.StatusCode != 200 {
+		if resp.StatusCode != http.StatusOK {
 			d = &DigestHeaders{}
 			err = fmt.Errorf("response status code was %v", resp.StatusCode)
 		}
