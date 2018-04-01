@@ -5,7 +5,8 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
-	"log"
+	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
@@ -33,10 +34,12 @@ type DigestHeaders struct {
 	Password  string
 }
 
+// SetCookies saves cookies for a specific host in the jar
 func (p *myjar) SetCookies(u *url.URL, cookies []*http.Cookie) {
 	p.jar[u.Host] = cookies
 }
 
+// Cookies returns all cookies from jar
 func (p *myjar) Cookies(u *url.URL) []*http.Cookie {
 	return p.jar[u.Host]
 }
@@ -94,15 +97,16 @@ func (d *DigestHeaders) Auth(username string, password string, uri string) (*Dig
 
 	req, err := http.NewRequest("GET", uri, nil)
 	if err != nil {
-		log.Printf("error in auth package: %v", err)
-		return d, err
+		return d, fmt.Errorf("error in auth package: %v", err)
 	}
+
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Printf("error in auth package: %v", err)
-		return d, err
+		return d, fmt.Errorf("error in auth package: %v", err)
 	}
-	defer resp.Body.Close()
+
+	io.Copy(ioutil.Discard, resp.Body)
+	resp.Body.Close()
 
 	if resp.StatusCode == http.StatusUnauthorized {
 
@@ -126,12 +130,14 @@ func (d *DigestHeaders) Auth(username string, password string, uri string) (*Dig
 
 		req, err = http.NewRequest("GET", uri, nil)
 		d.ApplyAuth(req)
+
 		resp, err = client.Do(req)
 		if err != nil {
-			log.Printf("error in auth package: %v", err)
-			return d, err
+			return d, fmt.Errorf("error in auth package: %v", err)
 		}
+
 		defer resp.Body.Close()
+
 		if resp.StatusCode != http.StatusOK {
 			d = &DigestHeaders{}
 			err = fmt.Errorf("response status code was %v", resp.StatusCode)
@@ -139,7 +145,6 @@ func (d *DigestHeaders) Auth(username string, password string, uri string) (*Dig
 		return d, err
 
 	} else if resp.StatusCode == http.StatusOK {
-		log.Printf("response status code was 200. Ignoring auth")
 		return nil, nil
 	}
 
